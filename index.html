@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en" class=""> <!-- The 'dark' class will be toggled here -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Dictionary App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        // Tailwind CSS dark mode configuration
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Lora', 'serif'],
+                        mono: ['Inconsolata', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px;}
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .dark ::-webkit-scrollbar-track { background: #2d3748; }
+        .dark ::-webkit-scrollbar-thumb { background: #718096; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans transition-colors duration-300">
+
+    <div class="w-full max-w-3xl mx-auto p-4 sm:p-8 min-h-screen">
+        
+        <!-- Header: Title, Theme Toggle, Font Selector -->
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-4xl font-bold text-gray-800 dark:text-white">Dictionary</h1>
+            <div class="flex items-center gap-4">
+                <!-- Font Selector Dropdown -->
+                <select id="fontSelector" class="bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="font-sans">Sans-Serif</option>
+                    <option value="font-serif">Serif</option>
+                    <option value="font-mono">Mono</option>
+                </select>
+
+                <!-- Theme Toggle Switch -->
+                <div class="flex items-center gap-2">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    <button id="themeToggle" class="relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 bg-gray-300 dark:bg-blue-600">
+                        <span class="inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 translate-x-1 dark:translate-x-6"></span>
+                    </button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                </div>
+            </div>
+        </header>
+
+        <!-- Search Form -->
+        <div class="relative mb-4">
+            <input type="text" id="searchInput" class="w-full p-4 pr-12 border-2 border-transparent bg-gray-200 dark:bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg" placeholder="Enter a word...">
+            <button id="searchButton" class="absolute top-1/2 right-4 -translate-y-1/2 text-blue-600 dark:text-blue-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </button>
+        </div>
+
+        <!-- Search History -->
+        <div id="historyContainer" class="flex flex-wrap gap-2 mb-6 h-8 items-center">
+            <!-- History buttons will be injected here -->
+        </div>
+
+        <!-- Results Container -->
+        <main id="resultContainer" class="space-y-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
+            <!-- Results will be injected here -->
+        </main>
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const resultContainer = document.getElementById('resultContainer');
+        const themeToggle = document.getElementById('themeToggle');
+        const fontSelector = document.getElementById('fontSelector');
+        const historyContainer = document.getElementById('historyContainer');
+        const body = document.body;
+        const html = document.documentElement;
+
+        const apiUrl = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+
+        // --- Core Functions ---
+
+        async function searchWord(wordToSearch) {
+            const word = (wordToSearch || searchInput.value).trim();
+            if (word === '') return;
+
+            // Show loading spinner
+            showLoading();
+
+            try {
+                const response = await fetch(apiUrl + word);
+                if (!response.ok) {
+                    throw new Error('Word not found. Please check the spelling.');
+                }
+                const data = await response.json();
+                displayResults(data[0]);
+                updateHistory(word);
+            } catch (error) {
+                displayError(error.message);
+            }
+        }
+
+        function showLoading() {
+            resultContainer.innerHTML = `
+                <div class="flex justify-center items-center p-10">
+                    <div class="w-10 h-10 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
+                </div>`;
+        }
+        
+        function displayError(message) {
+             resultContainer.innerHTML = `
+                <div class="text-center p-10">
+                    <h2 class="text-2xl font-bold mb-2">😕</h2>
+                    <p class="text-red-500">${message}</p>
+                </div>`;
+        }
+
+        function displayResults(wordData) {
+            resultContainer.innerHTML = ''; // Clear previous results or loader
+
+            const phonetic = wordData.phonetics.find(p => p.text && p.audio) || wordData.phonetics.find(p => p.text);
+            const audioUrl = phonetic?.audio;
+
+            let headerHTML = `
+                <div class="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-gray-600">
+                    <div>
+                        <h2 class="text-4xl sm:text-5xl font-bold text-gray-900 dark:text-white">${wordData.word}</h2>
+                        ${phonetic?.text ? `<p class="text-xl text-blue-500 mt-2">${phonetic.text}</p>` : ''}
+                    </div>
+                    ${audioUrl ? `
+                    <button onclick="playSound('${audioUrl}')" class="w-16 h-16 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full flex items-center justify-center hover:bg-blue-200 dark:hover:bg-blue-800 transition-transform transform hover:scale-110">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path d="M4.5 4.5a3 3 0 00-3 3v9a3 3 0 003 3h8.25a3 3 0 003-3v-9a3 3 0 00-3-3H4.5zM19.94 18.75l-2.69-2.69V7.94l2.69-2.69c.944-.945 2.56-.276 2.56 1.06v11.38c0 1.336-1.616 2.005-2.56 1.06z" /></svg>
+                    </button>` : ''}
+                </div>`;
+            resultContainer.insertAdjacentHTML('beforeend', headerHTML);
+
+            wordData.meanings.forEach(meaning => {
+                let meaningHTML = `
+                    <div class="mt-4">
+                        <h3 class="text-2xl font-semibold italic text-gray-700 dark:text-gray-300 flex items-center gap-4">
+                            ${meaning.partOfSpeech}
+                            <span class="h-px flex-grow bg-gray-200 dark:bg-gray-600"></span>
+                        </h3>`;
+                
+                meaning.definitions.forEach((def, index) => {
+                    meaningHTML += `
+                        <div class="mt-4 pl-4">
+                            <p class="text-gray-800 dark:text-gray-200"><span class="font-bold mr-2 text-blue-500">•</span>${def.definition}</p>
+                            ${def.example ? `<p class="text-gray-500 dark:text-gray-400 mt-2 ml-6 italic">"${def.example}"</p>` : ''}
+                        </div>`;
+                });
+
+                if (meaning.synonyms && meaning.synonyms.length > 0) {
+                    meaningHTML += `
+                        <div class="mt-6 flex gap-4 items-baseline">
+                            <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Synonyms:</h4>
+                            <p class="text-blue-600 dark:text-blue-400 flex flex-wrap gap-x-4 gap-y-2">
+                                ${meaning.synonyms.map(syn => `<span>${syn}</span>`).join('')}
+                            </p>
+                        </div>`;
+                }
+                meaningHTML += `</div>`;
+                resultContainer.insertAdjacentHTML('beforeend', meaningHTML);
+            });
+        }
+
+        function playSound(url) {
+            try {
+                const audio = new Audio(url);
+                audio.play();
+            } catch (e) {
+                console.error("Could not play audio:", e);
+            }
+        }
+
+        // --- Feature Functions: Theme, Font, History ---
+
+        function toggleTheme() {
+            html.classList.toggle('dark');
+            if (html.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+            } else {
+                localStorage.setItem('theme', 'light');
+            }
+        }
+
+        function applyFont(fontClass) {
+            body.className = body.className.replace(/font-(sans|serif|mono)/, '');
+            body.classList.add(fontClass);
+            localStorage.setItem('font', fontClass);
+            fontSelector.value = fontClass;
+        }
+
+        function updateHistory(word) {
+            let history = JSON.parse(localStorage.getItem('history')) || [];
+            // Remove if already exists to avoid duplicates
+            history = history.filter(item => item.toLowerCase() !== word.toLowerCase());
+            // Add to the beginning
+            history.unshift(word);
+            // Keep history to 5 items
+            if (history.length > 5) {
+                history.pop();
+            }
+            localStorage.setItem('history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            historyContainer.innerHTML = '';
+            const history = JSON.parse(localStorage.getItem('history')) || [];
+            if (history.length > 0) {
+                 history.forEach(word => {
+                    const historyBtn = document.createElement('button');
+                    historyBtn.textContent = word;
+                    historyBtn.className = "px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-full text-sm hover:bg-blue-500 hover:text-white transition-colors";
+                    historyBtn.onclick = () => {
+                        searchInput.value = word;
+                        searchWord(word);
+                    };
+                    historyContainer.appendChild(historyBtn);
+                });
+            }
+        }
+
+
+        // --- Initialization ---
+
+        function init() {
+            // Event Listeners
+            searchButton.addEventListener('click', () => searchWord());
+            searchInput.addEventListener('keyup', (event) => {
+                if (event.key === 'Enter') searchWord();
+            });
+            themeToggle.addEventListener('click', toggleTheme);
+            fontSelector.addEventListener('change', (e) => applyFont(e.target.value));
+
+            // Load user preferences from localStorage
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                html.classList.add('dark');
+            }
+            
+            const savedFont = localStorage.getItem('font') || 'font-sans';
+            applyFont(savedFont);
+
+            // Load search history
+            renderHistory();
+            
+            // "Word of the Day" on first load
+            const wordOfTheDayList = ["ephemeral", "serendipity", "ubiquitous", "eloquent", "mellifluous"];
+            const randomWord = wordOfTheDayList[Math.floor(Math.random() * wordOfTheDayList.length)];
+            searchWord(randomWord);
+        }
+
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+
+</body>
+</html>
